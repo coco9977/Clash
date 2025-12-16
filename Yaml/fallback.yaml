@@ -7,7 +7,7 @@
 proxy-providers:
 
   牛逼:
-    url: "https://zhuzhuzhu.whtjdasha.com/api/v1/client/subscribe?token=a102c7f1c02d1f351d68b31f1ae20fba"  
+    url: "111"  
     type: http
     interval: 86400
     health-check:
@@ -17,7 +17,7 @@ proxy-providers:
     proxy: 直连
 
   优选:
-    url: "https://url.v1.mk/sub?target=clash&url=https%3A%2F%2Fbxjdbxhv.pages.dev%2Fzhong%2Fsub&insert=false&config=https%3A%2F%2Fraw.githubusercontent.com%2FbyJoey%2Ftest%2Frefs%2Fheads%2Fmain%2Ftist.ini&emoji=true&list=false&xudp=false&udp=false&tfo=false&expand=true&scv=false&fdn=false&new_name=true"  
+    url: "111"  
     type: http
     interval: 86400
     health-check:
@@ -307,4 +307,5 @@ rule-providers:
 
   Steam / Domain: {<<: *domain, url: "https://gh-proxy.com/github.com/MetaCubeX/meta-rules-dat/blob/meta/geo/geosite/steam.mrs"}
   Epic / Domain: {<<: *domain, url: "https://gh-proxy.com/github.com/MetaCubeX/meta-rules-dat/blob/meta/geo/geosite/epicgames.mrs"}
+
   EA / Domain: {<<: *domain, url: "https://gh-proxy.com/github.com/MetaCubeX/meta-rules-dat/blob/meta/geo/geosite/ea.mrs"}
