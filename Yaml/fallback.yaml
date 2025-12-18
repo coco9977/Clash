@@ -228,15 +228,16 @@ proxy-groups:
 # ========================
 
 rules:
+  - RULE-SET,Direct / Domain,国内
   - RULE-SET,ChatGPT / Domain,AI
   - RULE-SET,Gemini / Domain,Google
   - RULE-SET,Copilot / Domain,AI
 
   - RULE-SET,Youtube / Domain,Google
   - RULE-SET,GitHub / Domain,Google
-  - RULE-SET,Google / IP,Google,no-resolve
+  - RULE-SET,Google / IP,Google
   - RULE-SET,Google / Domain,Google
-  - RULE-SET,CloudFlare / IP,CloudFlare,no-resolve
+  - RULE-SET,CloudFlare / IP,CloudFlare
   - RULE-SET,CloudFlare / Domain,CloudFlare
 
   - RULE-SET,Microsoft / Domain,Microsoft
@@ -244,7 +245,7 @@ rules:
   - RULE-SET,Nvidia / Domain,Nvidia
 
   - RULE-SET,TikTok / Domain,Stream Media
-  - RULE-SET,Netflix / IP,Stream Media,no-resolve
+  - RULE-SET,Netflix / IP,Stream Media
   - RULE-SET,Netflix / Domain,Stream Media
   - RULE-SET,Disney / Domain,Stream Media
   - RULE-SET,HBO / Domain,Stream Media
@@ -257,8 +258,7 @@ rules:
 
   - RULE-SET,Proxy / Domain,国外
   - RULE-SET,Globe / Domain,国外
-  - RULE-SET,Direct / Domain,国内
-  - RULE-SET,China / IP,国内,no-resolve
+  - RULE-SET,China / IP,国内
   - RULE-SET,China / Domain,国内
   - RULE-SET,Private / IP,国内,no-resolve
   - RULE-SET,Private / Domain,国内
@@ -307,5 +307,5 @@ rule-providers:
 
   Steam / Domain: {<<: *domain, url: "https://gh-proxy.com/github.com/MetaCubeX/meta-rules-dat/blob/meta/geo/geosite/steam.mrs"}
   Epic / Domain: {<<: *domain, url: "https://gh-proxy.com/github.com/MetaCubeX/meta-rules-dat/blob/meta/geo/geosite/epicgames.mrs"}
-
   EA / Domain: {<<: *domain, url: "https://gh-proxy.com/github.com/MetaCubeX/meta-rules-dat/blob/meta/geo/geosite/ea.mrs"}
+
