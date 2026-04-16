@@ -1,143 +1,92 @@
 # ==========================================================
-# 【全局参数模块】[General] 
-# 作用：控制 OpenClash 插件层面的基础运行逻辑
+# ==== 以下为 [General] 块：控制 OpenClash 插件底层行为 ====
 # ==========================================================
 [General]
-# 指定内核为 Meta，支持更多高级特性如 DNS 策略和嗅探
 CORE_TYPE = Meta
-# 开启 IPv6 支持及 IPv6 的 DNS 解析
+
+# --- DNS 相关 (让界面设置让步，交由下面的 YAML 块完全接管) ---
+ENABLE_REDIRECT_DNS = 1
+ENABLE_CUSTOM_DNS = 0
+APPEND_DEFAULT_DNS = 0
+APPEND_WAN_DNS = 0
+STORE_FAKEIP = 1
+ENABLE_RESPECT_RULES = 1
+
+# --- IPv6 相关 (底层开启 IPv6) ---
 IPV6_ENABLE = 1
 IPV6_DNS = 1
-# 运行模式：fake-ip (透明代理下最推荐的模式，解析速度极快)
+
+# --- 代理与模式 ---
 EN_MODE = fake-ip
-# 禁用 UDP QUIC (防止部分应用如 YouTube 使用 QUIC 绕过代理导致降级)
 DISABLE_UDP_QUIC = 1
-# 允许路由器自身的流量经过代理 (确保路由器上的 Docker 也能科学上网)
-ROUTER_SELF_PROXY = 1
-# 代理模式：基于规则分流 (rule)
 PROXY_MODE = rule
-# 网络栈类型：system (系统级网络栈，性能最好)
-STACK_TYPE = system
-# 开启 DNS 重定向和自定义 DNS 功能，接管局域网的 DNS 请求
-ENABLE_REDIRECT_DNS = 1
-ENABLE_CUSTOM_DNS = 1
-# 开启 Fake-IP 缓存和自定义过滤
-STORE_FAKEIP = 1
-CUSTOM_FAKEIP_FILTER = 1
-CUSTOM_FAKEIP_FILTER_MODE = blacklist
-# 开启 Meta 内核的高级域名嗅探功能，帮助识别纯 IP 请求背后的真实域名
-ENABLE_META_SNIFFER = 1
-ENABLE_META_SNIFFER_PURE_IP = 1
-# 开启 TCP 并发 (提高测速和网页多图加载速度)
-ENABLE_TCP_CONCURRENT = 1
-# 开启统一延迟计算 (让测速结果更接近真实体验)
-ENABLE_UNIFIED_DELAY = 1
-# 绕过代理服务器本身的真实 IP，防止循环路由死机
-SKIP_PROXY_ADDRESS = 1
+
 
 # ==========================================================
-# 【核心逻辑覆写模块】[YAML]
-# 作用：直接向底层的 config.yaml 注入 Meta 专属特性
+# ==== 以下为 YAML 块：配置文件语法级别覆写 ====
 # ==========================================================
-[YAML]
-ipv6: true                        # 允许内核处理 IPv6 流量
-geodata-mode: true                # 开启 Geodata 模式，支持 geosite 和 geoip 高效规则匹配
-unified-delay: true               # 内核级开启统一延迟
-tcp-concurrent: true              # 内核级开启 TCP 并发
+# [YAML] 标记必不可少，插件遇到此标记才会开始识别 YAML 修改
+# [YAML]
 
-# ==========================================================
-# 【DNS 解析与防泄露覆写模块】
-# 作用：接管全网域名解析。国内走阿里/腾讯直连，国外强制走节点加密解析。
-# ==========================================================
+# 1. 基础网络设置 (默认合并替换当前键值)
+ipv6: true
+allow-lan: true
+unified-delay: true
+tcp-concurrent: true
+
+# 2. Meta 专属嗅探器配置 (使用 ! 操作符，强制覆盖原有 sniffer 对象)
+sniffer!:
+  enable: true
+  parse-pure-ip: true
+  sniff:
+    tls:
+      ports: [443, 8443]
+    http:
+      ports: [80, 8080-8880]
+
+# 3. 终极防泄露 DNS 配置 (使用 ! 操作符，强制清理并覆盖整个 DNS 对象，彻底杜绝插件自带的冗余 DNS 干扰)
 dns!:
-  enable: true                    
-  listen: 0.0.0.0:7874            
-  ipv6: true                      
-  respect-rules: true             
-  enhanced-mode: fake-ip          
-  fake-ip-range: 198.18.0.1/16    
+  enable: true
+  ipv6: true
+  listen: 0.0.0.0:1053
   
-  # Fake-IP 白名单：确保局域网 NAS、Docker 容器以及国内域名获取真实 IP
-  fake-ip-filter: 
-    - "geosite:private"           
-    - "geosite:cn"                
-    - "+.localhost"               
-    - "+.local"                   
-    - "+.lan"                     
-    - "+.msftconnecttest.com"     
-    - "+.msftncsi.com"            
-    
-  default-nameserver: 
-    - 223.5.5.5                   
-    - 119.29.29.29                
-    - 2400:3200::1                
+  # 开启 Fake-IP
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  fake-ip-filter:
+    - '*.lan'
+    - '*.localdomain'
+    - '*.localhost'
+    - '*.local'
+    - '*.home.arpa'
+    - 'time.*.com'
+    - 'time.*.gov'
+    - 'time.*.edu.cn'
+    - 'time.*.apple.com'
+    - 'ntp.*.com'
+    - 'stun.*.*'
+    - 'xbox.*.*.microsoft.com'
+    - '*.msftncsi.com'
+    - '*.msftconnecttest.com'
 
-  nameserver-policy: 
-    "geosite:cn,private":
+  # default-nameserver: 仅作解析下方的 DoH/DoT 的真实 IP 用
+  default-nameserver:
+    - 223.5.5.5
+    - 119.29.29.29
+    - 2400:3200::1     # 阿里 IPv6
+    - 2402:4e00::      # DNSPod IPv6
+
+  # nameserver: 兜底使用，解析非国内域名
+  nameserver:
+    - https://dns.google/dns-query
+    - https://cloudflare-dns.com/dns-query
+    - tls://8.8.4.4
+
+  # nameserver-policy: 基于 Meta GeoSite 前置精准分流
+  nameserver-policy:
+    'geosite:cn,private': # 国内与局域网域名，直通国内 DNS
       - https://dns.alidns.com/dns-query
       - https://doh.pub/dns-query
-    "geosite:geolocation-!cn":
-      - "https://dns.google/dns-query#自建-故转"
-      - "https://1.1.1.1/dns-query#自建-故转"
-
-  nameserver: 
-    - https://dns.alidns.com/dns-query
-    - https://doh.pub/dns-query
-
-  fallback: 
-    - "https://dns.google/dns-query#自建-故转"
-    - "https://1.1.1.1/dns-query#自建-故转"
-
-  fallback-filter: 
-    geoip: true                   
-    geoip-code: CN                
-    geosite:
-      - gfw                       
-    domain: 
-      # 极高危防风控白名单：无视一切，强制节点解析，防封号
-      - "+.openai.com"
-      - "+.chatgpt.com"
-      - "+.anthropic.com"
-      - "+.claude.ai"
-      - "+.google.com"
-      - "+.googleapis.com"
-      - "+.gstatic.com"
-      - "+.googlevideo.com"
-      - "+.youtube.com"
-      - "+.facebook.com"
-      - "+.telegram.org"
-
-  proxy-server-nameserver:
-    - https://dns.alidns.com/dns-query
-    - https://doh.pub/dns-query
-  direct-nameserver:
-    - https://dns.alidns.com/dns-query
-    - https://doh.pub/dns-query
-  direct-nameserver-follow-policy: true
-
-# ==========================================================
-# 【流量嗅探覆写模块】
-# 作用：从纯 IP 流量中提取真实域名，确保分流规则正常工作。
-# ==========================================================
-sniffer!: 
-  enable: true                    
-  force-dns-mapping: true         
-  parse-pure-ip: true             
-  override-destination: true      
-  sniff:
-    HTTP:
-      ports: [80, 8080-8880]
-      override-destination: true
-    TLS:
-      ports: [443, 8443]          
-    QUIC:
-      ports: [443, 8443]          
-  
-  skip-domain: 
-    - "+.mi.com"                  
-    - "+.xiaomi.com"
-    - "+.apple.com"               
-    - "+.push.apple.com"          
-    - "+.msftconnecttest.com"     
-    - "+.msftncsi.com"            
-    - "+.googlevideo.com"
+    'geosite:geolocation-!cn': # 国外域名，强制远端加密解析，防污染防泄露
+      - https://dns.google/dns-query
+      - https://cloudflare-dns.com/dns-query
