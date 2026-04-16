@@ -11,12 +11,11 @@ IPV6_ENABLE = 1                   # [关键] 开启路由器底层 IPv6 支持�
 IPV6_DNS = 1                      # [关键] 允许 Clash 处理局域网设备的 IPv6 DNS 查询请求
 
 # 3. 核心运行模式
-EN_MODE = fake-ip                 # 插件运行模式：fake-ip/fake-ip-tun/fake-ip-mix
-ENABLE_UDP_PROXY = 1              # 启用 UDP 代理, 0: 禁用, 1: 启用, only for EN_MODE_TUN is nil
+EN_MODE = fake-ip-mix             # 插件运行模式：强烈建议使用 fake-ip-mix，防泄露且对局域网设备兼容性最好
 DISABLE_UDP_QUIC = 1              # 禁用 UDP QUIC：国内部分运营商会对 UDP 协议（如 HTTP/3）进行劣化或阻断，禁用可强制浏览器走更稳定的 TCP
 ROUTER_SELF_PROXY = 1             # 路由器自身代理：让路由器自己下载插件或更新规则时，也走代理网络
-PROXY_MODE = rule                 # 代理模式, rule/global/direct
-STACK_TYPE = system               # TUN 网络栈类型, system/gvisor/mixed
+PROXY_MODE = rule                 # 代理模式：基于规则分流
+STACK_TYPE = system               # TUN 网络栈类型：system 性能最稳定
 
 # 4. 流量劫持与拦截
 ENABLE_REDIRECT_DNS = 1           # 开启 DNS 重定向：强制劫持局域网内所有设备的 53 端口 DNS 请求，防止设备偷偷使用其他 DNS 导致泄露
@@ -35,10 +34,28 @@ SKIP_PROXY_ADDRESS = 1            # 跳过局域网保留地址：防止代理�
 CHINA_IP_ROUTE = 0                # 关闭底层 IPv4 绕过，让所有流量进内核接受规则管控
 CHINA_IP6_ROUTE = 0               # 关闭底层 IPv6 绕过
 CHNR_AUTO_UPDATE = 1              # 开启大陆 IP 库自动更新
-CHNR_UPDATE_WEEK_TIME = 0         # 每星期天更新
-CHNR_UPDATE_DAY_TIME = 4          # 每星期天凌晨 4 点更新
+CHNR_UPDATE_WEEK_TIME = * # 每天更新
+CHNR_UPDATE_DAY_TIME = 4          # 每天凌晨 4 点更新
 CHNR_CUSTOM_URL = default         # 使用官方默认源
 CHNR6_CUSTOM_URL = default        # 使用官方默认源
+
+# 7. Geo 数据库加载与更新机制 (GeoData)
+ENABLE_GEOIP_DAT = 1              # 【关键】启用 DAT 格式数据库，查询速度极快
+GEODATA_LOADER = standard         # 加载模式：standard 标准模式
+GEO_AUTO_UPDATE = 0               # 禁用老旧的 MMDB 格式自动更新
+
+GEOIP_AUTO_UPDATE = 1             # 开启 GeoIP (DAT) 自动更新
+GEOIP_UPDATE_WEEK_TIME = * # 每天检查
+GEOIP_UPDATE_DAY_TIME = 5         # 每天凌晨 5 点更新 (错开 4 点的 Chnroute)
+GEOIP_CUSTOM_URL = default
+
+GEOSITE_AUTO_UPDATE = 1           # 开启 GeoSite (域名库) 自动更新
+GEOSITE_UPDATE_WEEK_TIME = * GEOSITE_UPDATE_DAY_TIME = 5       
+GEOSITE_CUSTOM_URL = default      
+
+GEOASN_AUTO_UPDATE = 1            # 开启 GeoASN 自动更新
+GEOASN_UPDATE_WEEK_TIME = * GEOASN_UPDATE_DAY_TIME = 5        
+GEOASN_CUSTOM_URL = default       
 
 
 # ==========================================================
@@ -65,10 +82,9 @@ dns!:
   respect-rules: true             # 【重点】DNS 解析严格遵守下方的 routing 路由规则（防止解析流瞎跑）
   enhanced-mode: fake-ip          # 开启 Fake-IP 模式
   fake-ip-range: 198.18.0.1/16    # 假 IP 分配网段
-  fake-ip-filter-mode: rule       # 过滤名单判定模式
   
   # 【Fake-IP 白名单】以下域名会获取真实 IP，不发假 IP
-  fake-ip-filter:
+  fake-ip-filter: 
     - GEOSITE,private,real-ip     # 内网设备、路由器后台必须拿真实 IP，否则无法访问
     - GEOSITE,cn,real-ip          # 中国大陆域名直接拿真实 IP 直连，减轻路由器映射负担
     - DOMAIN-SUFFIX,localhost,real-ip
@@ -79,32 +95,34 @@ dns!:
     - MATCH,fake-ip               # 兜底：不在上述白名单的域名，一律发放 Fake-IP，交给节点去远端解析
     
   # 【默认 DNS】仅用于解析下方 DoH 域名（如 dns.alidns.com）本身的真实 IP，防止死循环
-  default-nameserver:
+  default-nameserver: 
     - 223.5.5.5                   # 阿里云公共 IPv4
     - 119.29.29.29                # 腾讯云公共 IPv4
     - 2400:3200::1                # 阿里云公共 IPv6
 
   # 【策略 DNS】Meta 核心专属防泄露利器
-  nameserver-policy:
+  nameserver-policy: 
+    # 国内域名（命中 CN 数据库）：直接通过 DoH 发给阿里/腾讯解析，速度最快
     "geosite:cn,private":
       - https://dns.alidns.com/dns-query
       - https://doh.pub/dns-query
+    # 国外域名（非 CN）：将解析请求强行塞进你机场的 "#自建-故转" 代理组，由节点在远端解析，本地运营商完全抓不到请求
     "geosite:geolocation-!cn":
       - "https://dns.google/dns-query#自建-故转"
       - "https://1.1.1.1/dns-query#自建-故转"
 
   # 【常规/国内 DNS】处理常规请求
-  nameserver:
+  nameserver: 
     - https://dns.alidns.com/dns-query
     - https://doh.pub/dns-query
 
   # 【兜底/国外 DNS】处理特殊请求（同样强制走节点代理）
-  fallback:
+  fallback: 
     - "https://dns.google/dns-query#自建-故转"
     - "https://1.1.1.1/dns-query#自建-故转"
 
   # 【回退过滤器】作为裁判，决定什么时候抛弃 nameserver 的结果，采用 fallback 的结果
-  fallback-filter:
+  fallback-filter: 
     geoip: true                   # 启用 IP 归属地判定
     geoip-code: CN                # 如果国内 DNS 解析出的 IP 不是 CN（中国），则丢弃，采用 fallback
     geosite:
@@ -122,7 +140,7 @@ dns!:
       - "+.facebook.com"
       - "+.telegram.org"
 
-  # 【节点/直连 专用解析】
+  # 【节点/直连 专用解析】修复 respect-rules 报错必须项
   # 告诉内核：机场节点的服务器域名（如 server.com）和直连流量，应该用什么 DNS 去解析
   proxy-server-nameserver:
     - https://dns.alidns.com/dns-query
@@ -137,7 +155,7 @@ dns!:
 # 作用：在透明代理（路由器）环境下，很多 APP 不发域名只发 IP。
 # 嗅探器能拆开数据包，把真实的域名“偷”出来，从而让你的规则正常匹配。
 # ==========================================================
-sniffer!:
+sniffer!: 
   enable: true                    # 开启嗅探器
   force-dns-mapping: true         # 强制反查 Fake-IP 映射池
   parse-pure-ip: true             # 尝试从纯 IP 流量中提取域名
@@ -152,7 +170,7 @@ sniffer!:
       ports: [443, 8443]          # 嗅探 HTTP/3 (UDP) 的 SNI 字段，对 YouTube 极其有效
   
   # 【免嗅探防断连白名单】某些系统级服务极其敏感，一旦被嗅探并篡改包头，就会断连。在此专门放行。
-  skip-domain:
+  skip-domain: 
     - "Mijia Cloud"               # 米家等智能家居
     - "+.apple.com"               # 苹果各项核心服务
     - "+.push.apple.com"          # 苹果消息推送（防收不到微信）
@@ -164,8 +182,11 @@ sniffer!:
 # 【核心安全规则前置模块】+rules:
 # 作用：使用 + 操作符，把这几条保命规则硬塞到所有订阅规则的最上方，确保绝对优先执行。
 # ==========================================================
-+rules:
++rules: 
+  # 【防死循环拦截】拦截局域网设备对 Fake-IP 网段发起的无意义直接请求，防止路由器日志爆仓甚至死机 
   - IP-CIDR,198.18.0.1/16,REJECT,no-resolve 
+  
+  # 【内网直连放行】以下全部为：局域网本地 IP 及 IPv6 内网保留地址，一律直连，绝对不进代理网络 
   - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
   - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
   - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve
