@@ -1,59 +1,90 @@
+# ==========================================================
+# 【全局参数模块】[General]
+# 作用：控制 OpenClash 插件在路由器底层的行为、防火墙劫持方式以及内核启动参数。
+# ==========================================================
 [General]
-# 指定使用 Meta 内核 [cite: 1]
-CORE_TYPE = Meta
+# 1. 内核选择
+CORE_TYPE = Meta                  # 强制指定使用 Mihomo (Meta) 内核，以支持下方的 sniffer 和 geosite 高级特性
 
-# --- 路由器系统级 IPv6 设置 ---
-# 必须在这里开启，让 OpenClash 的底层防火墙接管 IPv6 流量 
-IPV6_ENABLE = 1
-IPV6_DNS = 1
+# 2. IPv6 系统级支持
+IPV6_ENABLE = 1                   # [关键] 开启路由器底层 IPv6 支持，让 OpenWrt 防火墙将 IPv6 流量交给 Clash 处理
+IPV6_DNS = 1                      # [关键] 允许 Clash 处理局域网设备的 IPv6 DNS 查询请求
 
-# --- 基础运行模式 ---
-EN_MODE = fake-ip-mix
-DISABLE_UDP_QUIC = 1
-ROUTER_SELF_PROXY = 1
-PROXY_MODE = rule
-STACK_TYPE = system
+# 3. 核心运行模式
+EN_MODE = fake-ip                 # 插件运行模式：fake-ip/fake-ip-tun/fake-ip-mix
+ENABLE_UDP_PROXY = 1              # 启用 UDP 代理, 0: 禁用, 1: 启用, only for EN_MODE_TUN is nil
+DISABLE_UDP_QUIC = 1              # 禁用 UDP QUIC：国内部分运营商会对 UDP 协议（如 HTTP/3）进行劣化或阻断，禁用可强制浏览器走更稳定的 TCP
+ROUTER_SELF_PROXY = 1             # 路由器自身代理：让路由器自己下载插件或更新规则时，也走代理网络
+PROXY_MODE = rule                 # 代理模式, rule/global/direct
+STACK_TYPE = system               # TUN 网络栈类型, system/gvisor/mixed
 
-# --- 允许 OpenClash 劫持局域网 DNS ---
-ENABLE_REDIRECT_DNS = 1
+# 4. 流量劫持与拦截
+ENABLE_REDIRECT_DNS = 1           # 开启 DNS 重定向：强制劫持局域网内所有设备的 53 端口 DNS 请求，防止设备偷偷使用其他 DNS 导致泄露
+ENABLE_CUSTOM_DNS = 1             # 允许使用我们下方 [YAML] 中自定义的 DNS 规则
+STORE_FAKEIP = 1                  # 缓存 Fake-IP：记录分配过的假 IP，提高设备二次连接的速度
+CUSTOM_FAKEIP_FILTER = 1          # 启用自定义 Fake-IP 过滤名单
+
+# 5. 高级探测与优化
+ENABLE_META_SNIFFER = 1           # 开启域名嗅探：这是 Meta 核心的杀手锏。解决透明代理下只有 IP 没有域名，导致规则匹配失效的问题
+ENABLE_META_SNIFFER_PURE_IP = 1   # 强制嗅探纯 IP 连接：专门对付那些硬编码 IP 的 APP
+ENABLE_TCP_CONCURRENT = 1         # 开启 TCP 并发：向真实 IP 发起并发连接，谁先响应就用谁，极大提升网页首字节加载速度
+ENABLE_UNIFIED_DELAY = 1          # 统一延迟计算：让面板测试的延迟更准确，方便自动选择策略组进行客观切换
+SKIP_PROXY_ADDRESS = 1            # 跳过局域网保留地址：防止代理内部环回流量
+
+# 6. 大陆 IP 路由绕过 (Chnroute)
+CHINA_IP_ROUTE = 0                # 关闭底层 IPv4 绕过，让所有流量进内核接受规则管控
+CHINA_IP6_ROUTE = 0               # 关闭底层 IPv6 绕过
+CHNR_AUTO_UPDATE = 1              # 开启大陆 IP 库自动更新
+CHNR_UPDATE_WEEK_TIME = 0         # 每星期天更新
+CHNR_UPDATE_DAY_TIME = 4          # 每星期天凌晨 4 点更新
+CHNR_CUSTOM_URL = default         # 使用官方默认源
+CHNR6_CUSTOM_URL = default        # 使用官方默认源
 
 
+# ==========================================================
+# 【核心逻辑覆写模块】[YAML]
+# 作用：直接覆写 config.yaml 的底层内容。
+# 语法：使用 ! (强制覆盖整个键) 和 + (数组前置插入) 来确保配置生效。
+# ==========================================================
 [YAML]
-# ==========================================================
-# 基础全局设置合并 (键不存在则添加) [cite: 11]
-# ==========================================================
-ipv6: true
-geodata-mode: true
+
+# --- 基础配置特性 ---
+ipv6: true                        # 允许内核处理和转发 IPv6 数据包
+geodata-mode: true                # 启用 Geodata 模式（以支持 geosite: 和 geoip: 等高效数据库语法）
+unified-delay: true               # 内核级开启统一延迟
+tcp-concurrent: true              # 内核级开启 TCP 并发
 
 # ==========================================================
-# 强制覆盖 DNS 设置 (使用 ! 操作符，彻底替换插件默认生成的 DNS) [cite: 12]
+# 【DNS 解析与防泄露模块】dns!:
+# 作用：接管所有域名解析。国内走阿里/腾讯直连，国外强制走节点加密解析。
 # ==========================================================
 dns!:
-  enable: true
-  listen: 0.0.0.0:7874
-  ipv6: true
-  respect-rules: true
-  enhanced-mode: fake-ip
-  fake-ip-range: 198.18.0.1/16
-  fake-ip-filter-mode: rule
+  enable: true                    # 开启内核内置 DNS 服务器
+  listen: 0.0.0.0:7874            # 监听端口，接收从 OpenWrt 防火墙转发过来的局域网请求
+  ipv6: true                      # 允许解析 AAAA 记录，获取 IPv6 地址
+  respect-rules: true             # 【重点】DNS 解析严格遵守下方的 routing 路由规则（防止解析流瞎跑）
+  enhanced-mode: fake-ip          # 开启 Fake-IP 模式
+  fake-ip-range: 198.18.0.1/16    # 假 IP 分配网段
+  fake-ip-filter-mode: rule       # 过滤名单判定模式
   
-  # 现代精简版 Fake-IP 放行名单
+  # 【Fake-IP 白名单】以下域名会获取真实 IP，不发假 IP
   fake-ip-filter:
-    - GEOSITE,private,real-ip
-    - GEOSITE,cn,real-ip
+    - GEOSITE,private,real-ip     # 内网设备、路由器后台必须拿真实 IP，否则无法访问
+    - GEOSITE,cn,real-ip          # 中国大陆域名直接拿真实 IP 直连，减轻路由器映射负担
     - DOMAIN-SUFFIX,localhost,real-ip
     - DOMAIN-SUFFIX,local,real-ip
     - DOMAIN-SUFFIX,lan,real-ip
-    - DOMAIN-SUFFIX,msftconnecttest.com,real-ip
+    - DOMAIN-SUFFIX,msftconnecttest.com,real-ip # 微软网络探针，防 Windows 报“无网络”图标
     - DOMAIN-SUFFIX,msftncsi.com,real-ip
-    - MATCH,fake-ip
+    - MATCH,fake-ip               # 兜底：不在上述白名单的域名，一律发放 Fake-IP，交给节点去远端解析
     
+  # 【默认 DNS】仅用于解析下方 DoH 域名（如 dns.alidns.com）本身的真实 IP，防止死循环
   default-nameserver:
-    - 223.5.5.5
-    - 119.29.29.29
-    - 2400:3200::1 # 阿里 IPv6
+    - 223.5.5.5                   # 阿里云公共 IPv4
+    - 119.29.29.29                # 腾讯云公共 IPv4
+    - 2400:3200::1                # 阿里云公共 IPv6
 
-  # Meta 核心防泄露与分流策略
+  # 【策略 DNS】Meta 核心专属防泄露利器
   nameserver-policy:
     "geosite:cn,private":
       - https://dns.alidns.com/dns-query
@@ -62,30 +93,23 @@ dns!:
       - "https://dns.google/dns-query#自建-故转"
       - "https://1.1.1.1/dns-query#自建-故转"
 
+  # 【常规/国内 DNS】处理常规请求
   nameserver:
     - https://dns.alidns.com/dns-query
     - https://doh.pub/dns-query
 
+  # 【兜底/国外 DNS】处理特殊请求（同样强制走节点代理）
   fallback:
     - "https://dns.google/dns-query#自建-故转"
     - "https://1.1.1.1/dns-query#自建-故转"
 
-  proxy-server-nameserver:
-    - https://dns.alidns.com/dns-query
-    - https://doh.pub/dns-query
-
-  direct-nameserver:
-    - https://dns.alidns.com/dns-query
-    - https://doh.pub/dns-query
-
-  direct-nameserver-follow-policy: true
-
+  # 【回退过滤器】作为裁判，决定什么时候抛弃 nameserver 的结果，采用 fallback 的结果
   fallback-filter:
-    geoip: true
-    geoip-code: CN
+    geoip: true                   # 启用 IP 归属地判定
+    geoip-code: CN                # 如果国内 DNS 解析出的 IP 不是 CN（中国），则丢弃，采用 fallback
     geosite:
-      - gfw
-    domain:
+      - gfw                       # 访问被墙域名时，直接使用 fallback
+    domain:                       # 【极高危风控域名强管控】访问 AI 服务时，无视一切，强制走节点解析，防封号防 IP 脏
       - "+.openai.com"
       - "+.chatgpt.com"
       - "+.anthropic.com"
@@ -98,43 +122,50 @@ dns!:
       - "+.facebook.com"
       - "+.telegram.org"
 
-# ==========================================================
-# 强制覆盖嗅探器设置 (使用 ! 操作符) [cite: 12]
-# ==========================================================
-sniffer!:
-  enable: true
-  force-dns-mapping: true
-  parse-pure-ip: true
-  override-destination: true
-  sniff:
-    HTTP:
-      ports:
-        - 80
-        - 8080-8880
-      override-destination: true
-    TLS:
-      ports:
-        - 443
-        - 8443
-    QUIC:
-      ports:
-        - 443
-        - 8443
-  skip-domain:
-    - "Mijia Cloud"
-    - "+.apple.com"
-    - "+.push.apple.com"
-    - "+.msftconnecttest.com"
-    - "+.msftncsi.com"
-    - "+.googlevideo.com" 
+  # 【节点/直连 专用解析】
+  # 告诉内核：机场节点的服务器域名（如 server.com）和直连流量，应该用什么 DNS 去解析
+  proxy-server-nameserver:
+    - https://dns.alidns.com/dns-query
+    - https://doh.pub/dns-query
+  direct-nameserver:
+    - https://dns.alidns.com/dns-query
+    - https://doh.pub/dns-query
+  direct-nameserver-follow-policy: true
 
 # ==========================================================
-# 核心规则前置插入 (使用 + 操作符，确保这些安全规则在最顶端优先生效) [cite: 13]
+# 【流量嗅探模块】sniffer!:
+# 作用：在透明代理（路由器）环境下，很多 APP 不发域名只发 IP。
+# 嗅探器能拆开数据包，把真实的域名“偷”出来，从而让你的规则正常匹配。
+# ==========================================================
+sniffer!:
+  enable: true                    # 开启嗅探器
+  force-dns-mapping: true         # 强制反查 Fake-IP 映射池
+  parse-pure-ip: true             # 尝试从纯 IP 流量中提取域名
+  override-destination: true      # [关键] 用提取到的真实域名替换目标 IP，重新丢进 rules 匹配
+  sniff:
+    HTTP:
+      ports: [80, 8080-8880]
+      override-destination: true
+    TLS:
+      ports: [443, 8443]          # 嗅探 HTTPS 的 SNI 字段
+    QUIC:
+      ports: [443, 8443]          # 嗅探 HTTP/3 (UDP) 的 SNI 字段，对 YouTube 极其有效
+  
+  # 【免嗅探防断连白名单】某些系统级服务极其敏感，一旦被嗅探并篡改包头，就会断连。在此专门放行。
+  skip-domain:
+    - "Mijia Cloud"               # 米家等智能家居
+    - "+.apple.com"               # 苹果各项核心服务
+    - "+.push.apple.com"          # 苹果消息推送（防收不到微信）
+    - "+.msftconnecttest.com"     # 微软网络测试
+    - "+.msftncsi.com"            # 微软网络测试
+    - "+.googlevideo.com"         # YouTube 视频流跳过嗅探，防止缓冲卡顿或不加载
+
+# ==========================================================
+# 【核心安全规则前置模块】+rules:
+# 作用：使用 + 操作符，把这几条保命规则硬塞到所有订阅规则的最上方，确保绝对优先执行。
 # ==========================================================
 +rules:
-  # 拦截对 Fake-IP 的无意义请求防死循环
   - IP-CIDR,198.18.0.1/16,REJECT,no-resolve 
-  # 局域网及 IPv6 内网直连放行
   - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
   - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
   - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve
