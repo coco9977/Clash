@@ -1,43 +1,62 @@
 # ==========================================================
 # 【全局参数模块】[General]
-# 作用：控制 OpenClash 插件在路由器底层的行为、防火墙劫持方式以及内核启动参数。
 # ==========================================================
 [General]
-# 1. 内核选择
+# 1. 内核选择：核心类型 Smart or Meta
 CORE_TYPE = Meta
-
-# 2. IPv6 系统级支持
+# ==========================================================
+# 2. IPv6 设置
+# ==========================================================
+# 启用 IPv6
 IPV6_ENABLE = 1
+# 启用 IPv6 DNS
 IPV6_DNS = 1
+# IPv6 代理模式, 0: TProxy Mode, 1: Redirect Mode, 2: TUN Mode, 3: Mix Mode
+IPV6_MODE 
+# 启用 IPv6 UDP 代理
+ENABLE_V6_UDP_PROXY
 
+# ==========================================================
 # 3. 核心运行模式
+# ==========================================================
+# 运行模式：fake-ip/fake-ip-tun/fake-ip-mix
 EN_MODE = fake-ip
+# 禁用 UDP QUIC
 DISABLE_UDP_QUIC = 1
+# 启用 UDP 代理
 ROUTER_SELF_PROXY = 1
+# 代理模式
 PROXY_MODE = rule
+# 网络栈类型
 STACK_TYPE = system
 
+# ==========================================================
 # 4. 流量劫持与拦截
+# ==========================================================
+# DNS 重定向模式，0：禁用，1：Dnsmasq Redirect, 2：Firewall Redirect
 ENABLE_REDIRECT_DNS = 1
+# 自定义 DNS
 ENABLE_CUSTOM_DNS = 1
+# 启用 fake-ip 缓存
 STORE_FAKEIP = 1
+# 启用 Fake-IP-Filter
 CUSTOM_FAKEIP_FILTER = 1
+# Fake-IP 过滤模式, blacklist/whitelist
+CUSTOM_FAKEIP_FILTER_MODE = blacklist
 
+# ==========================================================
 # 5. 高级探测与优化
+# ==========================================================
+# 启用域名嗅探
 ENABLE_META_SNIFFER = 1
+# (强制嗅探纯 IP 连接
 ENABLE_META_SNIFFER_PURE_IP = 1
+# 启用 TCP 并发
 ENABLE_TCP_CONCURRENT = 1
+# 启用统一延迟计算
 ENABLE_UNIFIED_DELAY = 1
-SKIP_PROXY_ADDRESS = 1
-
-# 6. 大陆 IP 路由绕过 (Chnroute)
-CHINA_IP_ROUTE = 0
-CHINA_IP6_ROUTE = 0
-CHNR_AUTO_UPDATE = 1
-CHNR_UPDATE_WEEK_TIME = *
-CHNR_UPDATE_DAY_TIME = 4
-CHNR_CUSTOM_URL = default
-CHNR6_CUSTOM_URL = default   
+# 绕过服务器地址
+SKIP_PROXY_ADDRESS = 1  
 
 # ==========================================================
 # 【核心逻辑覆写模块】[YAML]
