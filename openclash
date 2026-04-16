@@ -1,40 +1,11 @@
-# ==========================================================
-# ==== 1. 底层行为控制 (接管面板设置) ====
-# ==========================================================
-[General]
-CORE_TYPE = Meta
-
-# --- 强制 DNS 行为 ---
-ENABLE_REDIRECT_DNS = 1
-ENABLE_CUSTOM_DNS = 0
-APPEND_DEFAULT_DNS = 0
-APPEND_WAN_DNS = 0
-STORE_FAKEIP = 1
-ENABLE_RESPECT_RULES = 1
-
-# --- 强制开启 IPv6 ---
-IPV6_ENABLE = 1
-IPV6_DNS = 1
-
-# --- 模式锁定 ---
-EN_MODE = fake-ip
-DISABLE_UDP_QUIC = 1
-PROXY_MODE = rule
-
-
-# ==========================================================
-# ==== 2. YAML 级强制覆写 ====
-# ==========================================================
-# [YAML]
-
-# 修复基础网络：开启 IPv6，启用 Geo 数据模式
+# 1. 基础网络设置
 ipv6: true
 geodata-mode: true
 tcp-concurrent: true
 unified-delay: true
 
-# 增加流量嗅探：Meta 核心防泄露利器
-sniffer!:
+# 2. 流量嗅探 (Meta 核心防泄露与精确路由必备)
+sniffer:
   enable: true
   parse-pure-ip: true
   sniff:
@@ -43,8 +14,8 @@ sniffer!:
     http:
       ports: [80, 8080-8880]
 
-# 彻底重构 DNS (使用 ! 强制覆盖，剔除你原配置中的 fallback 冗余)
-dns!:
+# 3. 彻底重构的防泄露 DNS
+dns:
   enable: true
   listen: 0.0.0.0:7874
   ipv6: true
@@ -52,7 +23,7 @@ dns!:
   enhanced-mode: fake-ip
   fake-ip-range: 198.18.0.1/16
   
-  # 保留你原有的 Rule 模式 Fake-IP 过滤
+  # Fake-IP 过滤 (放行局域网和微软探测)
   fake-ip-filter-mode: rule
   fake-ip-filter:
     - GEOSITE,private,real-ip
@@ -64,14 +35,14 @@ dns!:
     - DOMAIN-SUFFIX,msftncsi.com,real-ip
     - MATCH,fake-ip
 
-  # 默认 DNS，仅用于解析后续的 DoH 域名
+  # 默认 DNS，仅用于解析下方的 DoH 域名
   default-nameserver:
     - 223.5.5.5
     - 119.29.29.29
     - 2400:3200::1
     - 2402:4e00::
 
-  # Meta 专属纯净分流
+  # Meta 专属纯净分流（替代容易泄露的 fallback）
   nameserver-policy:
     "geosite:cn,private":
       - https://dns.alidns.com/dns-query
