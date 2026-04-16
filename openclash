@@ -17,7 +17,6 @@ sniffer:
 # 3. 彻底重构的防泄露 DNS
 dns:
   enable: true
-  listen: 0.0.0.0:7874
   ipv6: true
   respect-rules: true
   enhanced-mode: fake-ip
@@ -39,8 +38,6 @@ dns:
   default-nameserver:
     - 223.5.5.5
     - 119.29.29.29
-    - 2400:3200::1
-    - 2402:4e00::
 
   # Meta 专属纯净分流（替代容易泄露的 fallback）
   nameserver-policy:
