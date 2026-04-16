@@ -47,7 +47,6 @@ CHNR6_CUSTOM_URL = default
 [YAML]
 
 # --- 基础配置特性 ---
-mode: rule
 ipv6: true                        # 允许内核处理和转发 IPv6 数据包
 geodata-mode: true                # 启用 Geodata 模式（以支持 geosite: 和 geoip: 等高效数据库语法）
 unified-delay: true               # 内核级开启统一延迟
