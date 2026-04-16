@@ -7,7 +7,7 @@ CORE_TYPE = Meta
 
 # --- 代理与模式 ---
 # 插件运行模式 fake-ip/fake-ip-tun/fake-ip-mix
-EN_MODE = fake-ip-mix
+EN_MODE = fake-ip
 # 启用 UDP 代理
 ENABLE_UDP_PROXY = 1
 # 禁用 UDP QUIC
