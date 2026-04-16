@@ -1,133 +1,53 @@
 # ==========================================================
-# 【全局参数模块】[General]
-# ==========================================================
-[General]
-# 1. 内核选择：核心类型 Smart or Meta
-CORE_TYPE = Meta
-# ==========================================================
-# 2. IPv6 设置
-# ==========================================================
-# 启用 IPv6
-IPV6_ENABLE = 1
-# 启用 IPv6 DNS
-IPV6_DNS = 1
-# IPv6 代理模式, 0: TProxy Mode, 1: Redirect Mode, 2: TUN Mode, 3: Mix Mode
-IPV6_MODE 
-# 启用 IPv6 UDP 代理
-ENABLE_V6_UDP_PROXY
-
-# ==========================================================
-# 3. 核心运行模式
-# ==========================================================
-# 运行模式：fake-ip/fake-ip-tun/fake-ip-mix
-EN_MODE = fake-ip
-# 禁用 UDP QUIC
-DISABLE_UDP_QUIC = 1
-# 启用 UDP 代理
-ROUTER_SELF_PROXY = 1
-# 代理模式
-PROXY_MODE = rule
-# 网络栈类型
-STACK_TYPE = system
-
-# ==========================================================
-# 4. 流量劫持与拦截
-# ==========================================================
-# DNS 重定向模式，0：禁用，1：Dnsmasq Redirect, 2：Firewall Redirect
-ENABLE_REDIRECT_DNS = 1
-# 自定义 DNS
-ENABLE_CUSTOM_DNS = 1
-# 启用 fake-ip 缓存
-STORE_FAKEIP = 1
-# 启用 Fake-IP-Filter
-CUSTOM_FAKEIP_FILTER = 1
-# Fake-IP 过滤模式, blacklist/whitelist
-CUSTOM_FAKEIP_FILTER_MODE = blacklist
-
-# ==========================================================
-# 5. 高级探测与优化
-# ==========================================================
-# 启用域名嗅探
-ENABLE_META_SNIFFER = 1
-# (强制嗅探纯 IP 连接
-ENABLE_META_SNIFFER_PURE_IP = 1
-# 启用 TCP 并发
-ENABLE_TCP_CONCURRENT = 1
-# 启用统一延迟计算
-ENABLE_UNIFIED_DELAY = 1
-# 绕过服务器地址
-SKIP_PROXY_ADDRESS = 1  
-
-# ==========================================================
-# 【核心逻辑覆写模块】[YAML]
-# 作用：直接覆写 config.yaml 的底层内容。
-# 语法：使用 ! (强制覆盖整个键) 和 + (数组前置插入) 来确保配置生效。
-# ==========================================================
-[YAML]
-
-# --- 基础配置特性 ---
-ipv6: true                        # 允许内核处理和转发 IPv6 数据包
-geodata-mode: true                # 启用 Geodata 模式（以支持 geosite: 和 geoip: 等高效数据库语法）
-unified-delay: true               # 内核级开启统一延迟
-tcp-concurrent: true              # 内核级开启 TCP 并发
-
-# ==========================================================
-# 【DNS 解析与防泄露模块】dns!:
-# 作用：接管所有域名解析。国内走阿里/腾讯直连，国外强制走节点加密解析。
+# 【DNS 解析与防泄露覆写模块】
+# 作用：接管全网域名解析。国内走阿里/腾讯直连，国外强制走节点加密解析。
 # ==========================================================
 dns!:
-  enable: true                    # 开启内核内置 DNS 服务器
-  listen: 0.0.0.0:7874            # 监听端口，接收从 OpenWrt 防火墙转发过来的局域网请求
-  ipv6: true                      # 允许解析 AAAA 记录，获取 IPv6 地址
-  respect-rules: true             # 【重点】DNS 解析严格遵守下方的 routing 路由规则（防止解析流瞎跑）
-  enhanced-mode: fake-ip          # 开启 Fake-IP 模式
-  fake-ip-range: 198.18.0.1/16    # 假 IP 分配网段
+  enable: true                    
+  listen: 0.0.0.0:7874            
+  ipv6: true                      
+  respect-rules: true             
+  enhanced-mode: fake-ip          
+  fake-ip-range: 198.18.0.1/16    
   
-  # 【Fake-IP 白名单】以下域名会获取真实 IP，不发假 IP
+  # Fake-IP 白名单：确保局域网 NAS、Docker 容器以及国内域名获取真实 IP
   fake-ip-filter: 
-    - GEOSITE,private,real-ip     # 内网设备、路由器后台必须拿真实 IP，否则无法访问
-    - GEOSITE,cn,real-ip          # 中国大陆域名直接拿真实 IP 直连，减轻路由器映射负担
-    - DOMAIN-SUFFIX,localhost,real-ip
-    - DOMAIN-SUFFIX,local,real-ip
-    - DOMAIN-SUFFIX,lan,real-ip
-    - DOMAIN-SUFFIX,msftconnecttest.com,real-ip # 微软网络探针，防 Windows 报“无网络”图标
-    - DOMAIN-SUFFIX,msftncsi.com,real-ip
-    - MATCH,fake-ip               # 兜底：不在上述白名单的域名，一律发放 Fake-IP，交给节点去远端解析
+    - "geosite:private"           
+    - "geosite:cn"                
+    - "+.localhost"               
+    - "+.local"                   
+    - "+.lan"                     
+    - "+.msftconnecttest.com"     
+    - "+.msftncsi.com"            
     
-  # 【默认 DNS】仅用于解析下方 DoH 域名（如 dns.alidns.com）本身的真实 IP，防止死循环
   default-nameserver: 
-    - 223.5.5.5                   # 阿里云公共 IPv4
-    - 119.29.29.29                # 腾讯云公共 IPv4
-    - 2400:3200::1                # 阿里云公共 IPv6
+    - 223.5.5.5                   
+    - 119.29.29.29                
+    - 2400:3200::1                
 
-  # 【策略 DNS】Meta 核心专属防泄露利器
   nameserver-policy: 
-    # 国内域名（命中 CN 数据库）：直接通过 DoH 发给阿里/腾讯解析，速度最快
     "geosite:cn,private":
       - https://dns.alidns.com/dns-query
       - https://doh.pub/dns-query
-    # 国外域名（非 CN）：将解析请求强行塞进你机场的 "#自建-故转" 代理组，由节点在远端解析，本地运营商完全抓不到请求
     "geosite:geolocation-!cn":
       - "https://dns.google/dns-query#自建-故转"
       - "https://1.1.1.1/dns-query#自建-故转"
 
-  # 【常规/国内 DNS】处理常规请求
   nameserver: 
     - https://dns.alidns.com/dns-query
     - https://doh.pub/dns-query
 
-  # 【兜底/国外 DNS】处理特殊请求（同样强制走节点代理）
   fallback: 
     - "https://dns.google/dns-query#自建-故转"
     - "https://1.1.1.1/dns-query#自建-故转"
 
-  # 【回退过滤器】作为裁判，决定什么时候抛弃 nameserver 的结果，采用 fallback 的结果
   fallback-filter: 
-    geoip: true                   # 启用 IP 归属地判定
-    geoip-code: CN                # 如果国内 DNS 解析出的 IP 不是 CN（中国），则丢弃，采用 fallback
+    geoip: true                   
+    geoip-code: CN                
     geosite:
-      - gfw                       # 访问被墙域名时，直接使用 fallback
-    domain:                       # 【极高危风控域名强管控】访问 AI 服务时，无视一切，强制走节点解析，防封号防 IP 脏
+      - gfw                       
+    domain: 
+      # 极高危防风控白名单：无视一切，强制节点解析，防封号
       - "+.openai.com"
       - "+.chatgpt.com"
       - "+.anthropic.com"
@@ -140,8 +60,6 @@ dns!:
       - "+.facebook.com"
       - "+.telegram.org"
 
-  # 【节点/直连 专用解析】修复 respect-rules 报错必须项
-  # 告诉内核：机场节点的服务器域名（如 server.com）和直连流量，应该用什么 DNS 去解析
   proxy-server-nameserver:
     - https://dns.alidns.com/dns-query
     - https://doh.pub/dns-query
@@ -151,47 +69,28 @@ dns!:
   direct-nameserver-follow-policy: true
 
 # ==========================================================
-# 【流量嗅探模块】sniffer!:
-# 作用：在透明代理（路由器）环境下，很多 APP 不发域名只发 IP。
-# 嗅探器能拆开数据包，把真实的域名“偷”出来，从而让你的规则正常匹配。
+# 【流量嗅探覆写模块】
+# 作用：从纯 IP 流量中提取真实域名，确保分流规则正常工作。
 # ==========================================================
 sniffer!: 
-  enable: true                    # 开启嗅探器
-  force-dns-mapping: true         # 强制反查 Fake-IP 映射池
-  parse-pure-ip: true             # 尝试从纯 IP 流量中提取域名
-  override-destination: true      # [关键] 用提取到的真实域名替换目标 IP，重新丢进 rules 匹配
+  enable: true                    
+  force-dns-mapping: true         
+  parse-pure-ip: true             
+  override-destination: true      
   sniff:
     HTTP:
       ports: [80, 8080-8880]
       override-destination: true
     TLS:
-      ports: [443, 8443]          # 嗅探 HTTPS 的 SNI 字段
+      ports: [443, 8443]          
     QUIC:
-      ports: [443, 8443]          # 嗅探 HTTP/3 (UDP) 的 SNI 字段，对 YouTube 极其有效
+      ports: [443, 8443]          
   
-  # 【免嗅探防断连白名单】某些系统级服务极其敏感，一旦被嗅探并篡改包头，就会断连。在此专门放行。
   skip-domain: 
-    - "Mijia Cloud"               # 米家等智能家居
-    - "+.apple.com"               # 苹果各项核心服务
-    - "+.push.apple.com"          # 苹果消息推送（防收不到微信）
-    - "+.msftconnecttest.com"     # 微软网络测试
-    - "+.msftncsi.com"            # 微软网络测试
-    - "+.googlevideo.com"         # YouTube 视频流跳过嗅探，防止缓冲卡顿或不加载
-
-# ==========================================================
-# 【核心安全规则前置模块】+rules:
-# 作用：使用 + 操作符，把这几条保命规则硬塞到所有订阅规则的最上方，确保绝对优先执行。
-# ==========================================================
-+rules: 
-  # 【防死循环拦截】拦截局域网设备对 Fake-IP 网段发起的无意义直接请求，防止路由器日志爆仓甚至死机 
-  - IP-CIDR,198.18.0.1/16,REJECT,no-resolve 
-  
-  # 【内网直连放行】以下全部为：局域网本地 IP 及 IPv6 内网保留地址，一律直连，绝对不进代理网络 
-  - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
-  - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
-  - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve
-  - IP-CIDR,172.16.0.0/12,DIRECT,no-resolve
-  - IP-CIDR6,::1/128,DIRECT,no-resolve
-  - IP-CIDR6,fc00::/7,DIRECT,no-resolve
-  - IP-CIDR6,fe80::/10,DIRECT,no-resolve
-  - IP-CIDR6,fd00::/8,DIRECT,no-resolve
+    - "+.mi.com"                  
+    - "+.xiaomi.com"
+    - "+.apple.com"               
+    - "+.push.apple.com"          
+    - "+.msftconnecttest.com"     
+    - "+.msftncsi.com"            
+    - "+.googlevideo.com"
