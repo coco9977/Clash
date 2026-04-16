@@ -1,48 +1,65 @@
 # ==========================================================
-# ==== [General] 块：控制 OpenClash 插件底层行为 ====
+# 终极整合版：IPv6 + 严防泄露 DNS + 高阶分流 + 域名嗅探
 # ==========================================================
+
 [General]
+# 核心选择：必须使用 Meta (Mihomo) 核心以支持高级语法
 CORE_TYPE = Meta
-ENABLE_REDIRECT_DNS = 1
-ENABLE_CUSTOM_DNS = 0
-APPEND_DEFAULT_DNS = 0
-APPEND_WAN_DNS = 0
-STORE_FAKEIP = 1
-ENABLE_RESPECT_RULES = 1
+
+# --- 运行模式与基础代理 ---
+EN_MODE = fake-ip-mix
+PROXY_MODE = rule
+DISABLE_UDP_QUIC = 1
+ENABLE_TCP_CONCURRENT = 1
+RESTART = true
+
+# --- IPv6 设置 (全开启) ---
 IPV6_ENABLE = 1
 IPV6_DNS = 1
-EN_MODE = fake-ip
-DISABLE_UDP_QUIC = 1
-PROXY_MODE = rule
+CHINA_IP6_ROUTE = 1
+
+# --- DNS 插件层设置 (防泄露关键) ---
+ENABLE_REDIRECT_DNS = 1
+ENABLE_CUSTOM_DNS = 1
+APPEND_DEFAULT_DNS = 0
+APPEND_WAN_DNS = 0
+ENABLE_RESPECT_RULES = 1
+CUSTOM_NAME_POLICY = 1
+CUSTOM_FALLBACK_FILTER = 1
+
+# --- 流量嗅探 (插件开关) ---
+ENABLE_META_SNIFFER = 1
+ENABLE_META_SNIFFER_CUSTOM = 1
+ENABLE_META_SNIFFER_PURE_IP = 1
+
+# --- 其它功能 ---
+STORE_FAKEIP = 1
+CUSTOM_FAKEIP_FILTER = 1
+CUSTOM_FAKEIP_FILTER_MODE = blacklist
+FAKEIP_RANGE = 198.18.0.1/16
+CHINA_IP_ROUTE = 1
+INTRANET_ALLOWED = 1
+SKIP_PROXY_ADDRESS = 1
 
 # ==========================================================
-# ==== [YAML] 块：配置文件语法级别覆写 ====
+# 底层 YAML 覆写块 (使用 ! 强制覆盖整个块)
 # ==========================================================
+
 [YAML]
-
-# --- 1. 基础网络设置 ---
-mixed-port: 7890
-redir-port: 7892
-tproxy-port: 7895
-allow-lan: true
-mode: rule
-log-level: info
-ipv6: true
-unified-delay: true
-tcp-concurrent: true
-geodata-mode: true
-
-# --- 2. Meta 专属嗅探器配置 (强制覆盖) ---
+# 1. 域名嗅探精细化配置：强制覆盖整个 sniffer 块
 sniffer!:
   enable: true
   parse-pure-ip: true
   sniff:
-    tls:
+    TLS:
       ports: [443, 8443]
-    http:
+    HTTP:
       ports: [80, 8080-8880]
+      overwrite-destination: true
+    QUIC:
+      ports: [443]
 
-# --- 3. 终极防泄露 DNS 配置 (强制覆盖) ---
+# 2. 高级 DNS 逻辑配置：强制覆盖整个 dns 块
 dns!:
   enable: true
   listen: 0.0.0.0:7874
@@ -51,6 +68,8 @@ dns!:
   enhanced-mode: fake-ip
   fake-ip-range: 198.18.0.1/16
   fake-ip-filter-mode: rule
+  
+  # Fake-IP 过滤名单
   fake-ip-filter:
     - GEOSITE,private,real-ip
     - GEOSITE,cn,real-ip
@@ -60,26 +79,51 @@ dns!:
     - DOMAIN-SUFFIX,msftconnecttest.com,real-ip
     - DOMAIN-SUFFIX,msftncsi.com,real-ip
     - MATCH,fake-ip
-  
+    
+  # 引导 DNS (仅用于解析 DoH/DoT 域名)
   default-nameserver:
     - 223.5.5.5
     - 119.29.29.29
-    - 2400:3200::1
-    - 2402:4e00::
 
-  # 按 Meta GeoSite 前置精准分流
+  # 按域名策略选择 DNS (国内走直连 DoH，国外走代理 DoH)
   nameserver-policy:
     "geosite:cn,private":
       - https://dns.alidns.com/dns-query
       - https://doh.pub/dns-query
     "geosite:geolocation-!cn":
       - "https://dns.google/dns-query#自建-故转"
-      - "https://cloudflare-dns.com/dns-query#自建-故转"
+      - "https://1.1.1.1/dns-query#自建-故转"
 
+  # 国内解析 DNS
   nameserver:
-    - https://dns.google/dns-query
-    - https://cloudflare-dns.com/dns-query
+    - https://dns.alidns.com/dns-query
+    - https://doh.pub/dns-query
 
+  # 国外/备用解析 DNS (触发 fallback 机制时使用)
+  fallback:
+    - "https://dns.google/dns-query#自建-故转"
+    - "https://1.1.1.1/dns-query#自建-故转"
+
+  # Fallback 触发条件
+  fallback-filter:
+    geoip: true
+    geoip-code: CN
+    geosite:
+      - gfw
+    domain:
+      - "+.openai.com"
+      - "+.chatgpt.com"
+      - "+.anthropic.com"
+      - "+.claude.ai"
+      - "+.google.com"
+      - "+.googleapis.com"
+      - "+.gstatic.com"
+      - "+.googlevideo.com"
+      - "+.youtube.com"
+      - "+.facebook.com"
+      - "+.telegram.org"
+
+  # 代理节点与直连逻辑的 DNS 解析
   proxy-server-nameserver:
     - https://dns.alidns.com/dns-query
     - https://doh.pub/dns-query
