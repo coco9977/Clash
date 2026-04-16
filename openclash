@@ -1,0 +1,135 @@
+[General]
+# 指定使用 Meta 内核 [cite: 1]
+CORE_TYPE = Meta
+
+# --- 路由器系统级 IPv6 设置 ---
+# 必须在这里开启，让 OpenClash 的底层防火墙接管 IPv6 流量 
+IPV6_ENABLE = 1
+IPV6_DNS = 1
+
+# --- 基础运行模式 ---
+EN_MODE = fake-ip-mix
+DISABLE_UDP_QUIC = 1
+ROUTER_SELF_PROXY = 1
+PROXY_MODE = rule
+STACK_TYPE = system
+
+# --- 允许 OpenClash 劫持局域网 DNS ---
+ENABLE_REDIRECT_DNS = 1
+
+
+[YAML]
+# ==========================================================
+# 基础全局设置合并 (键不存在则添加) [cite: 11]
+# ==========================================================
+ipv6: true
+geodata-mode: true
+
+# ==========================================================
+# 强制覆盖 DNS 设置 (使用 ! 操作符，彻底替换插件默认生成的 DNS) [cite: 12]
+# ==========================================================
+dns!:
+  enable: true
+  listen: 0.0.0.0:7874
+  ipv6: true
+  respect-rules: true
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  fake-ip-filter-mode: rule
+  
+  # 现代精简版 Fake-IP 放行名单
+  fake-ip-filter:
+    - GEOSITE,private,real-ip
+    - GEOSITE,cn,real-ip
+    - DOMAIN-SUFFIX,localhost,real-ip
+    - DOMAIN-SUFFIX,local,real-ip
+    - DOMAIN-SUFFIX,lan,real-ip
+    - DOMAIN-SUFFIX,msftconnecttest.com,real-ip
+    - DOMAIN-SUFFIX,msftncsi.com,real-ip
+    - MATCH,fake-ip
+    
+  default-nameserver:
+    - 223.5.5.5
+    - 119.29.29.29
+    - 2400:3200::1 # 阿里 IPv6
+
+  # Meta 核心防泄露与分流策略
+  nameserver-policy:
+    "geosite:cn,private":
+      - https://dns.alidns.com/dns-query
+      - https://doh.pub/dns-query
+    "geosite:geolocation-!cn":
+      - "https://dns.google/dns-query#自建-故转"
+      - "https://1.1.1.1/dns-query#自建-故转"
+
+  nameserver:
+    - https://dns.alidns.com/dns-query
+    - https://doh.pub/dns-query
+
+  fallback:
+    - "https://dns.google/dns-query#自建-故转"
+    - "https://1.1.1.1/dns-query#自建-故转"
+
+  fallback-filter:
+    geoip: true
+    geoip-code: CN
+    geosite:
+      - gfw
+    domain:
+      - "+.openai.com"
+      - "+.chatgpt.com"
+      - "+.anthropic.com"
+      - "+.claude.ai"
+      - "+.google.com"
+      - "+.googleapis.com"
+      - "+.gstatic.com"
+      - "+.googlevideo.com"
+      - "+.youtube.com"
+      - "+.facebook.com"
+      - "+.telegram.org"
+
+# ==========================================================
+# 强制覆盖嗅探器设置 (使用 ! 操作符) [cite: 12]
+# ==========================================================
+sniffer!:
+  enable: true
+  force-dns-mapping: true
+  parse-pure-ip: true
+  override-destination: true
+  sniff:
+    HTTP:
+      ports:
+        - 80
+        - 8080-8880
+      override-destination: true
+    TLS:
+      ports:
+        - 443
+        - 8443
+    QUIC:
+      ports:
+        - 443
+        - 8443
+  skip-domain:
+    - "Mijia Cloud"
+    - "+.apple.com"
+    - "+.push.apple.com"
+    - "+.msftconnecttest.com"
+    - "+.msftncsi.com"
+    - "+.googlevideo.com" 
+
+# ==========================================================
+# 核心规则前置插入 (使用 + 操作符，确保这些安全规则在最顶端优先生效) [cite: 13]
+# ==========================================================
++rules:
+  # 拦截对 Fake-IP 的无意义请求防死循环
+  - IP-CIDR,198.18.0.1/16,REJECT,no-resolve 
+  # 局域网及 IPv6 内网直连放行
+  - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
+  - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
+  - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve
+  - IP-CIDR,172.16.0.0/12,DIRECT,no-resolve
+  - IP-CIDR6,::1/128,DIRECT,no-resolve
+  - IP-CIDR6,fc00::/7,DIRECT,no-resolve
+  - IP-CIDR6,fe80::/10,DIRECT,no-resolve
+  - IP-CIDR6,fd00::/8,DIRECT,no-resolve
