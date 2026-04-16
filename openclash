@@ -1,45 +1,79 @@
 # ==========================================================
-# 终极整合版：IPv6 + 严防泄露 DNS + 高阶分流 + 域名嗅探
+# 开启 IPV6 + 高阶 Meta 规则 DNS 分流防泄露配置
 # ==========================================================
 
 [General]
-# 核心选择：必须使用 Meta (Mihomo) 核心以支持高级语法
 CORE_TYPE = Meta
 
-# --- 运行模式与基础代理 ---
+# --- 代理与模式 ---
+# 插件运行模式 fake-ip/fake-ip-tun/fake-ip-mix
 EN_MODE = fake-ip-mix
-PROXY_MODE = rule
+# 启用 UDP 代理
+ENABLE_UDP_PROXY = 1
+# 禁用 UDP QUIC
 DISABLE_UDP_QUIC = 1
-ENABLE_TCP_CONCURRENT = 1
-RESTART = true
+# 路由器自身代理
+ROUTER_SELF_PROXY = 1
+# TUN 网络栈类型 system/gvisor/mixed
+STACK_TYPE = mixed
+# 代理模式 rule/global/direct
+PROXY_MODE = rule
 
-# --- IPv6 设置 (全开启) ---
+# --- IPv6 相关 (开启 IPv6) ---
+# 启用 IPv6
 IPV6_ENABLE = 1
+# 启用 IPv6 DNS
 IPV6_DNS = 1
-CHINA_IP6_ROUTE = 1
+# IPv6 代理模式
+IPV6_MODE = 0
+# 启用 IPv6 UDP 代理
+ENABLE_V6_UDP_PROXY = 1
 
-# --- DNS 插件层设置 (防泄露关键) ---
+# --- 分流相关 ---
+
+# --- DNS 相关 (防止 DNS 泄露的基础保障) ---
+# DNS 重定向模式
 ENABLE_REDIRECT_DNS = 1
+# 自定义 DNS
 ENABLE_CUSTOM_DNS = 1
+# 自动追加 default-nameserver DNS
 APPEND_DEFAULT_DNS = 0
+# 追加上游分配 DNS
 APPEND_WAN_DNS = 0
+# DNS 查询是否遵循规则
 ENABLE_RESPECT_RULES = 1
+# 自定义 Nameserver-Policy
 CUSTOM_NAME_POLICY = 1
+# 自定义 Fallback-Filter
 CUSTOM_FALLBACK_FILTER = 1
 
-# --- 流量嗅探 (插件开关) ---
+# --- Fake-IP 设置 (流量劫持防泄露) ---
+# 启用 fake-ip 缓存
+STORE_FAKEIP = 1
+# 启用 Fake-IP-Filter
+CUSTOM_FAKEIP_FILTER = 1
+# Fake-IP 过滤模式
+CUSTOM_FAKEIP_FILTER_MODE = blacklist
+# 自定义 Fake-IP 地址段
+FAKEIP_RANGE = 198.18.0.1/16
+
+# --- 域名嗅探 (辅助防泄露和精准分流) ---
+# 启用域名嗅探
 ENABLE_META_SNIFFER = 1
+# 启用自定义嗅探规则
 ENABLE_META_SNIFFER_CUSTOM = 1
+# 强制嗅探纯 IP 连接
 ENABLE_META_SNIFFER_PURE_IP = 1
 
-# --- 其它功能 ---
-STORE_FAKEIP = 1
-CUSTOM_FAKEIP_FILTER = 1
-CUSTOM_FAKEIP_FILTER_MODE = blacklist
-FAKEIP_RANGE = 198.18.0.1/16
-CHINA_IP_ROUTE = 1
+# --- 其它基础配置 ---
+# 仅允许内网访问
 INTRANET_ALLOWED = 1
-SKIP_PROXY_ADDRESS = 1
+# 启用 TCP 并发
+ENABLE_TCP_CONCURRENT = 1
+# 启用统一延迟
+ENABLE_UNIFIED_DELAY = 1
+# 模块更新后重启插件
+RESTART = true
 
 # ==========================================================
 # 底层 YAML 覆写块 (使用 ! 强制覆盖整个块)
@@ -107,7 +141,7 @@ dns!:
   # Fallback 触发条件
   fallback-filter:
     geoip: true
-    geoip-code: CN
+    geoip-code: cn
     geosite:
       - gfw
     domain:
