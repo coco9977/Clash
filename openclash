@@ -1,10 +1,10 @@
 # ==========================================================
-# ==== 以下为 [General] 块：控制 OpenClash 插件底层行为 ====
+# ==== 1. 底层行为控制 (接管面板设置) ====
 # ==========================================================
 [General]
 CORE_TYPE = Meta
 
-# --- DNS 相关 (让界面设置让步，交由下面的 YAML 块完全接管) ---
+# --- 强制 DNS 行为 ---
 ENABLE_REDIRECT_DNS = 1
 ENABLE_CUSTOM_DNS = 0
 APPEND_DEFAULT_DNS = 0
@@ -12,29 +12,28 @@ APPEND_WAN_DNS = 0
 STORE_FAKEIP = 1
 ENABLE_RESPECT_RULES = 1
 
-# --- IPv6 相关 (底层开启 IPv6) ---
+# --- 强制开启 IPv6 ---
 IPV6_ENABLE = 1
 IPV6_DNS = 1
 
-# --- 代理与模式 ---
+# --- 模式锁定 ---
 EN_MODE = fake-ip
 DISABLE_UDP_QUIC = 1
 PROXY_MODE = rule
 
 
 # ==========================================================
-# ==== 以下为 YAML 块：配置文件语法级别覆写 ====
+# ==== 2. YAML 级强制覆写 ====
 # ==========================================================
-# [YAML] 标记必不可少，插件遇到此标记才会开始识别 YAML 修改
 # [YAML]
 
-# 1. 基础网络设置 (默认合并替换当前键值)
+# 修复基础网络：开启 IPv6，启用 Geo 数据模式
 ipv6: true
-allow-lan: true
-unified-delay: true
+geodata-mode: true
 tcp-concurrent: true
+unified-delay: true
 
-# 2. Meta 专属嗅探器配置 (使用 ! 操作符，强制覆盖原有 sniffer 对象)
+# 增加流量嗅探：Meta 核心防泄露利器
 sniffer!:
   enable: true
   parse-pure-ip: true
@@ -44,49 +43,52 @@ sniffer!:
     http:
       ports: [80, 8080-8880]
 
-# 3. 终极防泄露 DNS 配置 (使用 ! 操作符，强制清理并覆盖整个 DNS 对象，彻底杜绝插件自带的冗余 DNS 干扰)
+# 彻底重构 DNS (使用 ! 强制覆盖，剔除你原配置中的 fallback 冗余)
 dns!:
   enable: true
-  ipv6: true
   listen: 0.0.0.0:7874
-  
-  # 开启 Fake-IP
+  ipv6: true
+  respect-rules: true
   enhanced-mode: fake-ip
   fake-ip-range: 198.18.0.1/16
+  
+  # 保留你原有的 Rule 模式 Fake-IP 过滤
+  fake-ip-filter-mode: rule
   fake-ip-filter:
-    - '*.lan'
-    - '*.localdomain'
-    - '*.localhost'
-    - '*.local'
-    - '*.home.arpa'
-    - 'time.*.com'
-    - 'time.*.gov'
-    - 'time.*.edu.cn'
-    - 'time.*.apple.com'
-    - 'ntp.*.com'
-    - 'stun.*.*'
-    - 'xbox.*.*.microsoft.com'
-    - '*.msftncsi.com'
-    - '*.msftconnecttest.com'
+    - GEOSITE,private,real-ip
+    - GEOSITE,cn,real-ip
+    - DOMAIN-SUFFIX,localhost,real-ip
+    - DOMAIN-SUFFIX,local,real-ip
+    - DOMAIN-SUFFIX,lan,real-ip
+    - DOMAIN-SUFFIX,msftconnecttest.com,real-ip
+    - DOMAIN-SUFFIX,msftncsi.com,real-ip
+    - MATCH,fake-ip
 
-  # default-nameserver: 仅作解析下方的 DoH/DoT 的真实 IP 用
+  # 默认 DNS，仅用于解析后续的 DoH 域名
   default-nameserver:
     - 223.5.5.5
     - 119.29.29.29
-    - 2400:3200::1     # 阿里 IPv6
-    - 2402:4e00::      # DNSPod IPv6
+    - 2400:3200::1
+    - 2402:4e00::
 
-  # nameserver: 兜底使用，解析非国内域名
-  nameserver:
-    - https://dns.google/dns-query
-    - https://cloudflare-dns.com/dns-query
-    - tls://8.8.4.4
-
-  # nameserver-policy: 基于 Meta GeoSite 前置精准分流
+  # Meta 专属纯净分流
   nameserver-policy:
-    'geosite:cn,private': # 国内与局域网域名，直通国内 DNS
+    "geosite:cn,private":
       - https://dns.alidns.com/dns-query
       - https://doh.pub/dns-query
-    'geosite:geolocation-!cn': # 国外域名，强制远端加密解析，防污染防泄露
-      - https://dns.google/dns-query
-      - https://cloudflare-dns.com/dns-query
+    "geosite:geolocation-!cn":
+      - "https://dns.google/dns-query#自建-故转"
+      - "https://1.1.1.1/dns-query#自建-故转"
+
+  nameserver:
+    - https://dns.alidns.com/dns-query
+    - https://doh.pub/dns-query
+    
+  proxy-server-nameserver:
+    - https://dns.alidns.com/dns-query
+    - https://doh.pub/dns-query
+    
+  direct-nameserver:
+    - https://dns.alidns.com/dns-query
+    - https://doh.pub/dns-query
+  direct-nameserver-follow-policy: true
