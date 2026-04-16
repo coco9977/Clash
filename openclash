@@ -1,4 +1,51 @@
 # ==========================================================
+# 【全局参数模块】[General] 
+# 作用：控制 OpenClash 插件层面的基础运行逻辑
+# ==========================================================
+[General]
+# 指定内核为 Meta，支持更多高级特性如 DNS 策略和嗅探
+CORE_TYPE = Meta
+# 开启 IPv6 支持及 IPv6 的 DNS 解析
+IPV6_ENABLE = 1
+IPV6_DNS = 1
+# 运行模式：fake-ip (透明代理下最推荐的模式，解析速度极快)
+EN_MODE = fake-ip
+# 禁用 UDP QUIC (防止部分应用如 YouTube 使用 QUIC 绕过代理导致降级)
+DISABLE_UDP_QUIC = 1
+# 允许路由器自身的流量经过代理 (确保路由器上的 Docker 也能科学上网)
+ROUTER_SELF_PROXY = 1
+# 代理模式：基于规则分流 (rule)
+PROXY_MODE = rule
+# 网络栈类型：system (系统级网络栈，性能最好)
+STACK_TYPE = system
+# 开启 DNS 重定向和自定义 DNS 功能，接管局域网的 DNS 请求
+ENABLE_REDIRECT_DNS = 1
+ENABLE_CUSTOM_DNS = 1
+# 开启 Fake-IP 缓存和自定义过滤
+STORE_FAKEIP = 1
+CUSTOM_FAKEIP_FILTER = 1
+CUSTOM_FAKEIP_FILTER_MODE = blacklist
+# 开启 Meta 内核的高级域名嗅探功能，帮助识别纯 IP 请求背后的真实域名
+ENABLE_META_SNIFFER = 1
+ENABLE_META_SNIFFER_PURE_IP = 1
+# 开启 TCP 并发 (提高测速和网页多图加载速度)
+ENABLE_TCP_CONCURRENT = 1
+# 开启统一延迟计算 (让测速结果更接近真实体验)
+ENABLE_UNIFIED_DELAY = 1
+# 绕过代理服务器本身的真实 IP，防止循环路由死机
+SKIP_PROXY_ADDRESS = 1
+
+# ==========================================================
+# 【核心逻辑覆写模块】[YAML]
+# 作用：直接向底层的 config.yaml 注入 Meta 专属特性
+# ==========================================================
+[YAML]
+ipv6: true                        # 允许内核处理 IPv6 流量
+geodata-mode: true                # 开启 Geodata 模式，支持 geosite 和 geoip 高效规则匹配
+unified-delay: true               # 内核级开启统一延迟
+tcp-concurrent: true              # 内核级开启 TCP 并发
+
+# ==========================================================
 # 【DNS 解析与防泄露覆写模块】
 # 作用：接管全网域名解析。国内走阿里/腾讯直连，国外强制走节点加密解析。
 # ==========================================================
