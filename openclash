@@ -127,7 +127,7 @@ dns!:
   # 核心防漏点：把 nameserver(默认DNS) 全部替换为国外加密 DNS 并强制走节点！
   nameserver:
     - "https://dns.google/dns-query#自建-故转"
-    - "https://1.1.1.1/dns-query#自建-故转"
+    - "https://cloudflare-dns.com/dns-query#自建-故转"
   
   # 代理节点与直连逻辑的基础 DNS 解析
   proxy-server-nameserver:
