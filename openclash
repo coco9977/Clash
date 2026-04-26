@@ -111,6 +111,8 @@ dns!:
     - DOMAIN-SUFFIX,lan,real-ip
     - DOMAIN-SUFFIX,msftconnecttest.com,real-ip
     - DOMAIN-SUFFIX,msftncsi.com,real-ip
+    - DOMAIN-KEYWORD,time,real-ip
+    - DOMAIN-KEYWORD,ntp,real-ip
     - MATCH,fake-ip
     
   # 引导 DNS (仅用于建立连接时解析基础 DoH 域名)
@@ -124,12 +126,12 @@ dns!:
       - https://dns.alidns.com/dns-query
       - https://doh.pub/dns-query
 
-  # 核心防漏点：把 nameserver(默认DNS) 全部替换为国外加密 DNS 并强制走节点！
+  # 核心防漏点：把 nameserver(默认DNS) 全部替换为国外加密 DNS
   nameserver:
-    - "https://dns.google/dns-query"
-    - "https://cloudflare-dns.com/dns-query"
+    - 'https://dns.google/dns-query#自建-故转'
+    - 'https://cloudflare-dns.com/dns-query#自建-故转'
   
-  # 代理节点与直连逻辑的基础 DNS 解析
+  # 代理节点与直连逻辑的基础 DNS 解析 (保持国内 DNS 即可，保证最快找到节点 IP)
   proxy-server-nameserver:
     - https://dns.alidns.com/dns-query
     - https://doh.pub/dns-query
